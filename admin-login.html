@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Login | Prime Shopping Hub</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f3f6fa;
+      display: grid;
+      place-items: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+    .card {
+      background: white;
+      padding: 30px;
+      border-radius: 14px;
+      width: min(380px, calc(100% - 40px));
+      box-shadow: 0 10px 35px #0001;
+    }
+    h1 { color: #123f78; font-size: 23px; }
+    input, button {
+      width: 100%;
+      padding: 13px;
+      margin-top: 12px;
+      box-sizing: border-box;
+      border-radius: 8px;
+    }
+    input { border: 1px solid #ccd5df; }
+    button {
+      border: 0;
+      background: #123f78;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    #message { font-size: 13px; margin-top: 15px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Admin Login</h1>
+    <p>Sign in to manage Prime Shopping Hub.</p>
+
+    <form id="loginForm">
+      <input id="username" placeholder="Admin username" required>
+      <input id="password" type="password" placeholder="Password" required>
+      <button type="submit">Sign in</button>
+    </form>
+
+    <p id="message"></p>
+  </div>
+
+  <script>
+    document.getElementById("loginForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      const message = document.getElementById("message");
+      message.textContent = "Signing in...";
+
+      try {
+        const response = await fetch("/api/admin/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: document.getElementById("username").value,
+            password: document.getElementById("password").value
+          })
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+          window.location.href = "/admin.html";
+        } else {
+          message.textContent = result.message || "Login failed. Please try again.";
+        }
+      } catch (error) {
+        message.textContent = "Could not connect to the server.";
+      }
+    });
+  </script>
+</body>
+</html>

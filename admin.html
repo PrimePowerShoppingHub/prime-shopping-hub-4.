@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prime Shopping Hub | Admin Dashboard</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:#f3f6fb;color:#172b45}
+.layout{display:flex;min-height:100vh}
+.sidebar{width:245px;background:#103663;color:white;padding:28px 18px;flex-shrink:0}
+.brand{font-size:19px;font-weight:bold;line-height:1.5;margin-bottom:42px}
+.brand span{display:block;color:#edbd50;font-size:11px;letter-spacing:2px}
+.menu a{display:block;padding:14px;margin-bottom:9px;color:#dce7f4;text-decoration:none;border-radius:8px;font-size:14px}
+.menu a.active,.menu a:hover{background:#edbd50;color:#17314e}
+.main{flex:1;min-width:0;padding:28px}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:30px}
+.topbar h1{font-size:25px}
+.topbar p{color:#718096;font-size:13px;margin-top:7px}
+.admin-label{background:white;padding:12px 16px;border-radius:9px;font-size:13px;font-weight:bold}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-bottom:28px}
+.stat-card{background:white;border-radius:12px;padding:23px;box-shadow:0 3px 15px #18365a0b}
+.stat-card p{color:#718096;font-size:13px;margin-bottom:13px}
+.stat-card h2{font-size:25px;color:#103663}
+.content-card{background:white;border-radius:12px;padding:24px;margin-bottom:22px;box-shadow:0 3px 15px #18365a0b}
+.content-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:20px}
+.content-heading h2{font-size:18px}
+.gold-button{background:#edbd50;color:#17314e;border:none;padding:12px 17px;border-radius:8px;font-weight:bold;cursor:pointer}
+table{width:100%;border-collapse:collapse;text-align:left}
+th,td{padding:15px 10px;border-bottom:1px solid #edf0f5;font-size:13px}
+th{color:#718096;font-size:12px}
+.status{background:#fff3d6;color:#956800;padding:6px 10px;border-radius:20px;font-size:11px}
+.quick-links{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}
+.quick-link{border:1px solid #e5eaf1;padding:20px;border-radius:10px}
+.quick-link h3{font-size:14px;margin-bottom:8px}
+.quick-link p{color:#718096;font-size:12px;line-height:1.6}
+.modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;justify-content:center;align-items:center;padding:20px}
+.modal-box{background:white;padding:25px;border-radius:15px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto}
+.modal-box h2{margin-bottom:20px}
+.modal-box label{display:block;font-size:13px;font-weight:bold;color:#34445a}
+.modal-box input,.modal-box textarea,.modal-box select{display:block;width:100%;padding:10px;margin:8px 0 15px;border:1px solid #d9e0e9;border-radius:7px;font:inherit}
+.modal-actions{display:flex;gap:10px;align-items:center}
+.secondary-button{background:#edf1f6;color:#26384e;border:0;padding:12px 17px;border-radius:8px;font-weight:bold;cursor:pointer}
+#productMessage{font-size:13px;margin-top:12px;line-height:1.5}
+@media(max-width:900px){.stats{grid-template-columns:repeat(2,1fr)}.quick-links{grid-template-columns:1fr}}
+@media(max-width:600px){.layout{display:block}.sidebar{width:100%;padding:17px}.brand{margin-bottom:15px}.menu{display:flex;flex-wrap:wrap;gap:5px}.menu a{padding:9px;margin:0;font-size:12px}.main{padding:18px}.stats{grid-template-columns:1fr 1fr;gap:10px}.stat-card{padding:15px}.stat-card h2{font-size:20px}.topbar h1{font-size:20px}.content-card{overflow-x:auto}}
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand">PRIME SHOPPING HUB<span>ADMIN PANEL</span></div>
+    <nav class="menu">
+      <a href="#" class="active">📊 Dashboard</a>
+      <a href="#products">📦 Products</a>
+      <a href="#orders">🛒 Orders</a>
+      <a href="#customers">👥 Customers</a>
+      <a href="#branding">🎨 Store Branding</a>
+      <a href="#settings">⚙️ Settings</a>
+      <a href="#" onclick="logout(); return false;">🚪 Logout</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <h1>Dashboard Overview</h1>
+        <p>Welcome to your Prime Shopping Hub control centre.</p>
+      </div>
+      <div class="admin-label">Administrator</div>
+    </div>
+
+    <div class="stats">
+      <div class="stat-card"><p>Total Sales</p><h2>₦0</h2></div>
+      <div class="stat-card"><p>Total Orders</p><h2>0</h2></div>
+      <div class="stat-card"><p>Total Products</p><h2 id="totalProducts">0</h2></div>
+      <div class="stat-card"><p>Total Customers</p><h2>0</h2></div>
+    </div>
+
+    <section class="content-card" id="products">
+      <div class="content-heading">
+        <h2>Product Management</h2>
+        <button class="gold-button" type="button" onclick="openProductForm()">+ Add New Product</button>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr><th>Product</th><th>Category</th><th>Price</th><th>Stock</th><th>Image</th></tr>
+          </thead>
+          <tbody id="productTableBody">
+            <tr><td colspan="5">Loading products...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="color:#718096;font-size:12px;margin-top:12px">Product records are saved to your store database.</p>
+    </section>
+
+    <section class="content-card" id="orders">
+      <div class="content-heading">
+        <h2>Recent Orders</h2>
+        <span class="status">Awaiting connection</span>
+      </div>
+      <table>
+        <thead><tr><th>Order ID</th><th>Customer</th><th>Amount</th><th>Payment</th></tr></thead>
+        <tbody><tr><td colspan="4">Your customer orders will appear here.</td></tr></tbody>
+      </table>
+    </section>
+
+    <section class="content-card" id="customers">
+      <h2 style="margin-bottom:15px">Customer Management</h2>
+      <p style="color:#718096;font-size:13px">Customer information and order history will appear here once connected.</p>
+    </section>
+
+    <section class="content-card" id="branding">
+      <h2 style="margin-bottom:15px">Store Branding</h2>
+      <div class="quick-links">
+        <div class="quick-link"><h3>Store Logo</h3><p>Manage your business logo.</p></div>
+        <div class="quick-link"><h3>Website Banner</h3><p>Manage your homepage promotional images.</p></div>
+        <div class="quick-link"><h3>Store Appearance</h3><p>Manage your store's colours and identity.</p></div>
+      </div>
+    </section>
+
+    <section class="content-card" id="settings">
+      <h2 style="margin-bottom:15px">Store Settings</h2>
+      <p style="color:#718096;font-size:13px">Delivery information, contact details and store preferences will be managed here.</p>
+    </section>
+  </main>
+</div>
+
+<div id="productModal" class="modal-backdrop">
+  <div class="modal-box">
+    <h2>Add New Product</h2>
+    <form id="productForm">
+      <label for="productName">Product Name</label>
+      <input type="text" id="productName" required maxlength="150">
+
+      <label for="productPrice">Price (₦)</label>
+      <input type="number" id="productPrice" min="1" step="0.01" required>
+
+      <label for="productDescription">Description</label>
+      <textarea id="productDescription" rows="3" required maxlength="1000"></textarea>
+
+      <label for="productCategory">Category</label>
+      <select id="productCategory" required>
+        <option value="">Choose category</option>
+        <option value="CCTV">CCTV</option>
+        <option value="NVR">NVR</option>
+        <option value="Networking">Networking</option>
+        <option value="Cable">Cable</option>
+        <option value="Extender">Extender</option>
+<option value="Splitter">Splitter</option>
+<option value="Solar Generator">Solar Generator</option>
+<option value="CCTV Switching Power Supply">CCTV Switching Power Supply</option>
+        <option value="Lighting">Lighting</option>
+        <option value="Electrical">Electrical</option>
+      </select>
+
+      <label for="productStock">Stock Quantity</label>
+      <input type="number" id="productStock" min="0" step="1" required>
+
+      <label for="productImage">Product Image</label>
+      <input type="file" id="productImage" accept="image/*">
+
+      <div class="modal-actions">
+        <button type="submit" class="gold-button" id="saveProductButton">Save Product</button>
+        <button type="button" class="secondary-button" onclick="closeProductForm()">Cancel</button>
+      </div>
+      <p id="productMessage" role="status" aria-live="polite"></p>
+    </form>
+  </div>
+</div>
+
+<script>
+async function logout() {
+  try {
+    const response = await fetch("/api/admin/logout", { method: "POST" });
+    if (!response.ok) throw new Error("Logout failed");
+    window.location.href = "/admin-login.html";
+  } catch (error) {
+    alert("Unable to log out. Please try again.");
+  }
+}
+
+function openProductForm() {
+  document.getElementById("productMessage").textContent = "";
+  document.getElementById("productModal").style.display = "flex";
+}
+
+function closeProductForm() {
+  document.getElementById("productModal").style.display = "none";
+}
+
+document.getElementById("productForm").addEventListener("submit", async function(event) {
+  event.preventDefault();
+
+  const formData = new FormData();
+  formData.append("name", document.getElementById("productName").value.trim());
+  formData.append("price", document.getElementById("productPrice").value);
+  formData.append("description", document.getElementById("productDescription").value.trim());
+  formData.append("category", document.getElementById("productCategory").value);
+  formData.append("stock", document.getElementById("productStock").value);
+
+  const image = document.getElementById("productImage").files[0];
+  if (image) formData.append("image", image);
+
+  const saveButton = document.getElementById("saveProductButton");
+  const message = document.getElementById("productMessage");
+
+  saveButton.disabled = true;
+  saveButton.textContent = "Saving...";
+  message.textContent = "Saving product...";
+
+  try {
+    const response = await fetch("/api/admin/products", {
+      method: "POST",
+      body: formData
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || "Unable to add product.");
+    }
+
+    message.textContent = "Product added successfully.";
+    document.getElementById("productForm").reset();
+    await loadProducts();
+    setTimeout(closeProductForm, 900);
+
+  } catch (error) {
+    message.textContent = error.message || "Could not connect to the server. Please try again.";
+
+  } finally {
+    saveButton.disabled = false;
+    saveButton.textContent = "Save Product";
+  }
+});
+
+async function loadProducts() {
+  const tableBody = document.getElementById("productTableBody");
+
+  try {
+    const response = await fetch("/api/admin/products");
+
+    if (!response.ok) throw new Error("Unable to load products.");
+
+    const result = await response.json();
+
+    if (!result.success || !Array.isArray(result.products)) {
+      throw new Error("Unexpected product data.");
+    }
+
+    document.getElementById("totalProducts").textContent = result.products.length;
+
+    if (result.products.length === 0) {
+      tableBody.innerHTML = '<tr><td colspan="5">No products added yet. Select “Add New Product” to begin.</td></tr>';
+      return;
+    }
+
+    tableBody.innerHTML = result.products.map(product => {
+      const imageCell = product.image
+        ? `<a href="${escapeHtml(product.image)}" target="_blank" rel="noopener">View image</a>`
+        : "No image";
+
+      return `<tr>
+        <td>${escapeHtml(product.name)}</td>
+        <td>${escapeHtml(product.category || "")}</td>
+        <td>₦${Number(product.price).toLocaleString("en-NG")}</td>
+        <td>${Number(product.stock) || 0}</td>
+        <td>${imageCell}</td>
+      </tr>`;
+    }).join("");
+
+  } catch (error) {
+    tableBody.innerHTML = '<tr><td colspan="5">Could not load products. Refresh the page or sign in again.</td></tr>';
+    console.error("Load products error:", error);
+  }
+}
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, character => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[character]);
+}
+
+document.getElementById("productModal").addEventListener("click", function(event) {
+  if (event.target === this) closeProductForm();
+});
+
+loadProducts();
+</script>
+</body>
+</html>
