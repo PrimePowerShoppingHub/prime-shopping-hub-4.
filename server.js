@@ -6,6 +6,8 @@ const multer = require("multer");
 const dotenv = require("dotenv");
 const path = require("path");
 const fs = require("fs");
+const crypto = require("crypto");
+const { DatabaseSync } = require("node:sqlite");
 const db = require("./database");
 
 dotenv.config();
@@ -14,7 +16,10 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Create uploads folder if it does not exist
-const uploadFolder = path.join(__dirname, "uploads");
+const dataFolder =
+  process.env.RAILWAY_VOLUME_MOUNT_PATH || __dirname;
+
+const uploadFolder = path.join(dataFolder, "uploads");
 
 if (!fs.existsSync(uploadFolder)) {
   fs.mkdirSync(uploadFolder, { recursive: true });
@@ -63,7 +68,117 @@ const upload = multer({
     callback(null, true);
   }
 });
+// Temporary recovery-file upload settings
+const recoveryUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024,
+    files: 101
+  }
+});
 
+function requireRecoveryToken(req, res, next) {
+  const token = req.headers["x-recovery-token"];
+  const expectedToken = process.env.RECOVERY_UPLOAD_TOKEN;
+
+  if (
+    !expectedToken ||
+    typeof token !== "string" ||
+    token.length !== expectedToken.length ||
+    !crypto.timingSafeEqual(
+      Buffer.from(token),
+      Buffer.from(expectedToken)
+    )
+  ) {
+    return res.status(401).json({
+      success: false,
+      message: "Unauthorized."
+    });
+  }
+
+  next();
+}
+// TEMPORARY PROTECTED RECOVERY ROUTE
+app.post(
+  "/api/recovery/upload",
+  requireRecoveryToken,
+  recoveryUpload.fields([
+    { name: "database", maxCount: 1 },
+    { name: "images", maxCount: 100 }
+  ]),
+  (req, res) => {
+    try {
+      const token = req.headers["x-recovery-token"];
+      const expectedToken = process.env.RECOVERY_UPLOAD_TOKEN;
+
+      if (
+        !expectedToken ||
+        typeof token !== "string" ||
+        token.length !== expectedToken.length ||
+        !crypto.timingSafeEqual(
+          Buffer.from(token),
+          Buffer.from(expectedToken)
+        )
+      ) {
+        return res.status(401).json({
+          success: false,
+          message: "Unauthorized."
+        });
+      }
+
+      const databaseFile = req.files?.database?.[0];
+      const imageFiles = req.files?.images || [];
+
+      if (!databaseFile || !imageFiles.length) {
+        return res.status(400).json({
+          success: false,
+          message: "Database backup and image files are required."
+        });
+      }
+
+      const recoveryFolder = path.join(dataFolder, "recovery-inbox");
+      fs.mkdirSync(recoveryFolder, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(recoveryFolder, "database-recovery.db"),
+        databaseFile.buffer
+      );
+
+      for (const file of imageFiles) {
+        const filename = path.basename(file.originalname);
+
+        if (
+          filename !== file.originalname ||
+          !/^[a-zA-Z0-9_.-]+$/.test(filename) ||
+          !/^image\//.test(file.mimetype)
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid image file."
+          });
+        }
+
+        fs.writeFileSync(
+          path.join(recoveryFolder, filename),
+          file.buffer
+        );
+      }
+
+      res.json({
+        success: true,
+        message: "Recovery files received.",
+        imageCount: imageFiles.length
+      });
+    } catch (error) {
+      console.error("Recovery upload error:", error);
+
+      res.status(500).json({
+        success: false,
+        message: "Recovery upload failed."
+      });
+    }
+  }
+);
 // Check whether an administrator is logged in
 function requireAdmin(req, res, next) {
   if (req.session && req.session.admin) {

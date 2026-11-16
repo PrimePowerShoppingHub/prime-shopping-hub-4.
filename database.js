@@ -1,11 +1,22 @@
 
 const { DatabaseSync } = require("node:sqlite");
 const path = require("path");
+const fs = require("fs");
 
-const dbPath = path.join(__dirname, "prime-shopping-hub.db");
+// Use Railway's persistent volume when deployed.
+// Keep the original database location when running locally.
+const dataFolder =
+  process.env.RAILWAY_VOLUME_MOUNT_PATH || __dirname;
+
+// Make sure the storage folder exists.
+fs.mkdirSync(dataFolder, { recursive: true });
+
+// Database file location
+const dbPath = path.join(dataFolder, "prime-shopping-hub.db");
+
 const db = new DatabaseSync(dbPath);
 
-// Create the tables if they do not already exist
+// Create the tables if they do not already exist.
 db.exec(`
   CREATE TABLE IF NOT EXISTS products (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -35,5 +46,7 @@ db.exec(`
     password TEXT NOT NULL
   );
 `);
+
+console.log("Database location:", dbPath);
 
 module.exports = db;

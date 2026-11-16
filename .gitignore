@@ -8,3 +8,6 @@ prime-shopping-hub.db-*
 *.sqlite
 *.sqlite3
 *.db
+uploads-recovery/
+uploads-recovery.zip
+database-recovery.db
