@@ -6,180 +6,91 @@ const multer = require("multer");
 const dotenv = require("dotenv");
 const path = require("path");
 const fs = require("fs");
-const crypto = require("crypto");
-const { DatabaseSync } = require("node:sqlite");
-const db = require("./database");
 
+// Load environment variables before loading the database.
 dotenv.config();
+
+const db = require("./database");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Create uploads folder if it does not exist
+// Railway runs behind a proxy.
+if (process.env.NODE_ENV === "production") {
+  app.set("trust proxy", 1);
+}
+
+// Use Railway persistent storage when available.
 const dataFolder =
   process.env.RAILWAY_VOLUME_MOUNT_PATH || __dirname;
 
 const uploadFolder = path.join(dataFolder, "uploads");
 
-if (!fs.existsSync(uploadFolder)) {
-  fs.mkdirSync(uploadFolder, { recursive: true });
-}
+fs.mkdirSync(uploadFolder, { recursive: true });
 
-// Basic middleware
+// Basic middleware.
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Admin sessions
+// Admin sessions.
+if (!process.env.ADMIN_SESSION_SECRET) {
+  console.warn("WARNING: ADMIN_SESSION_SECRET is not configured.");
+}
+
 app.use(
   session({
-    secret: process.env.ADMIN_SESSION_SECRET || "change-this-session-secret",
+    secret:
+      process.env.ADMIN_SESSION_SECRET ||
+      "change-this-session-secret",
     resave: false,
     saveUninitialized: false,
     cookie: {
       maxAge: 2 * 60 * 60 * 1000,
       httpOnly: true,
-      secure: false,
+      secure: process.env.NODE_ENV === "production",
       sameSite: "lax"
     }
   })
 );
 
-// Product image upload settings
+// Product image storage.
 const storage = multer.diskStorage({
   destination: (req, file, callback) => {
     callback(null, uploadFolder);
   },
+
   filename: (req, file, callback) => {
     const extension = path.extname(file.originalname).toLowerCase();
+
     const filename =
-      Date.now() + "-" + Math.round(Math.random() * 1e9) + extension;
+      Date.now() + "-" +
+      Math.round(Math.random() * 1e9) +
+      extension;
 
     callback(null, filename);
   }
 });
 
+// Image upload settings.
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
+
+  limits: {
+    fileSize: 5 * 1024 * 1024
+  },
+
   fileFilter: (req, file, callback) => {
     if (!file.mimetype.startsWith("image/")) {
-      return callback(new Error("Only image files are allowed."));
+      return callback(
+        new Error("Only image files are allowed.")
+      );
     }
+
     callback(null, true);
   }
 });
-// Temporary recovery-file upload settings
-const recoveryUpload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 10 * 1024 * 1024,
-    files: 101
-  }
-});
 
-function requireRecoveryToken(req, res, next) {
-  const token = req.headers["x-recovery-token"];
-  const expectedToken = process.env.RECOVERY_UPLOAD_TOKEN;
-
-  if (
-    !expectedToken ||
-    typeof token !== "string" ||
-    token.length !== expectedToken.length ||
-    !crypto.timingSafeEqual(
-      Buffer.from(token),
-      Buffer.from(expectedToken)
-    )
-  ) {
-    return res.status(401).json({
-      success: false,
-      message: "Unauthorized."
-    });
-  }
-
-  next();
-}
-// TEMPORARY PROTECTED RECOVERY ROUTE
-app.post(
-  "/api/recovery/upload",
-  requireRecoveryToken,
-  recoveryUpload.fields([
-    { name: "database", maxCount: 1 },
-    { name: "images", maxCount: 100 }
-  ]),
-  (req, res) => {
-    try {
-      const token = req.headers["x-recovery-token"];
-      const expectedToken = process.env.RECOVERY_UPLOAD_TOKEN;
-
-      if (
-        !expectedToken ||
-        typeof token !== "string" ||
-        token.length !== expectedToken.length ||
-        !crypto.timingSafeEqual(
-          Buffer.from(token),
-          Buffer.from(expectedToken)
-        )
-      ) {
-        return res.status(401).json({
-          success: false,
-          message: "Unauthorized."
-        });
-      }
-
-      const databaseFile = req.files?.database?.[0];
-      const imageFiles = req.files?.images || [];
-
-      if (!databaseFile || !imageFiles.length) {
-        return res.status(400).json({
-          success: false,
-          message: "Database backup and image files are required."
-        });
-      }
-
-      const recoveryFolder = path.join(dataFolder, "recovery-inbox");
-      fs.mkdirSync(recoveryFolder, { recursive: true });
-
-      fs.writeFileSync(
-        path.join(recoveryFolder, "database-recovery.db"),
-        databaseFile.buffer
-      );
-
-      for (const file of imageFiles) {
-        const filename = path.basename(file.originalname);
-
-        if (
-          filename !== file.originalname ||
-          !/^[a-zA-Z0-9_.-]+$/.test(filename) ||
-          !/^image\//.test(file.mimetype)
-        ) {
-          return res.status(400).json({
-            success: false,
-            message: "Invalid image file."
-          });
-        }
-
-        fs.writeFileSync(
-          path.join(recoveryFolder, filename),
-          file.buffer
-        );
-      }
-
-      res.json({
-        success: true,
-        message: "Recovery files received.",
-        imageCount: imageFiles.length
-      });
-    } catch (error) {
-      console.error("Recovery upload error:", error);
-
-      res.status(500).json({
-        success: false,
-        message: "Recovery upload failed."
-      });
-    }
-  }
-);
-// Check whether an administrator is logged in
+// Check whether an administrator is logged in.
 function requireAdmin(req, res, next) {
   if (req.session && req.session.admin) {
     return next();
@@ -191,12 +102,12 @@ function requireAdmin(req, res, next) {
   });
 }
 
-// Admin login page
+// Admin login page.
 app.get("/admin-login.html", (req, res) => {
   res.sendFile(path.join(__dirname, "admin-login.html"));
 });
 
-// Protect the admin dashboard
+// Protect admin dashboard.
 app.get("/admin.html", (req, res) => {
   if (!req.session || !req.session.admin) {
     return res.redirect("/admin-login.html");
@@ -205,7 +116,7 @@ app.get("/admin.html", (req, res) => {
   res.sendFile(path.join(__dirname, "admin.html"));
 });
 
-// Admin login API
+// Admin login API.
 app.post("/api/admin/login", async (req, res) => {
   try {
     const username = String(req.body.username || "").trim();
@@ -241,15 +152,38 @@ app.post("/api/admin/login", async (req, res) => {
       });
     }
 
-    req.session.admin = {
-      id: admin.id,
-      username: admin.username
-    };
+    req.session.regenerate((error) => {
+      if (error) {
+        console.error("Session error:", error);
 
-    res.json({
-      success: true,
-      message: "Login successful."
+        return res.status(500).json({
+          success: false,
+          message: "Unable to create admin session."
+        });
+      }
+
+      req.session.admin = {
+        id: admin.id,
+        username: admin.username
+      };
+
+      req.session.save((saveError) => {
+        if (saveError) {
+          console.error("Session save error:", saveError);
+
+          return res.status(500).json({
+            success: false,
+            message: "Unable to save admin session."
+          });
+        }
+
+        res.json({
+          success: true,
+          message: "Login successful."
+        });
+      });
     });
+
   } catch (error) {
     console.error("Admin login error:", error);
 
@@ -260,7 +194,7 @@ app.post("/api/admin/login", async (req, res) => {
   }
 });
 
-// Admin logout API
+// Admin logout API.
 app.post("/api/admin/logout", (req, res) => {
   req.session.destroy((error) => {
     if (error) {
@@ -279,7 +213,7 @@ app.post("/api/admin/logout", (req, res) => {
   });
 });
 
-// Public product list for the shopping homepage
+// Public product list.
 app.get("/api/products", (req, res) => {
   try {
     const products = db.prepare(
@@ -292,6 +226,7 @@ app.get("/api/products", (req, res) => {
       success: true,
       products
     });
+
   } catch (error) {
     console.error("Public products error:", error);
 
@@ -302,7 +237,7 @@ app.get("/api/products", (req, res) => {
   }
 });
 
-// Get all products for the admin dashboard
+// Get all products for admin.
 app.get("/api/admin/products", requireAdmin, (req, res) => {
   try {
     const products = db.prepare(
@@ -313,6 +248,7 @@ app.get("/api/admin/products", requireAdmin, (req, res) => {
       success: true,
       products
     });
+
   } catch (error) {
     console.error("Admin products error:", error);
 
@@ -323,7 +259,7 @@ app.get("/api/admin/products", requireAdmin, (req, res) => {
   }
 });
 
-// Add a new product
+// Add a new product.
 app.post(
   "/api/admin/products",
   requireAdmin,
@@ -364,6 +300,7 @@ app.post(
         message: "Product added successfully.",
         productId: Number(result.lastInsertRowid)
       });
+
     } catch (error) {
       console.error("Add product error:", error);
 
@@ -375,7 +312,7 @@ app.post(
   }
 );
 
-// Update an existing product
+// Update an existing product.
 app.put(
   "/api/admin/products/:id",
   requireAdmin,
@@ -383,6 +320,7 @@ app.put(
   (req, res) => {
     try {
       const id = Number(req.params.id);
+
       const existing = db.prepare(
         "SELECT * FROM products WHERE id = ?"
       ).get(id);
@@ -399,6 +337,7 @@ app.put(
       const price = Number(req.body.price);
       const category = String(req.body.category || "").trim();
       const stock = Number(req.body.stock);
+
       const image = req.file
         ? "/uploads/" + req.file.filename
         : existing.image;
@@ -421,12 +360,21 @@ app.put(
          SET name = ?, description = ?, price = ?,
              category = ?, image = ?, stock = ?
          WHERE id = ?`
-      ).run(name, description, price, category, image, stock, id);
+      ).run(
+        name,
+        description,
+        price,
+        category,
+        image,
+        stock,
+        id
+      );
 
       res.json({
         success: true,
         message: "Product updated successfully."
       });
+
     } catch (error) {
       console.error("Update product error:", error);
 
@@ -438,37 +386,42 @@ app.put(
   }
 );
 
-// Delete a product
-app.delete("/api/admin/products/:id", requireAdmin, (req, res) => {
-  try {
-    const id = Number(req.params.id);
+// Delete a product.
+app.delete(
+  "/api/admin/products/:id",
+  requireAdmin,
+  (req, res) => {
+    try {
+      const id = Number(req.params.id);
 
-    const result = db.prepare(
-      "DELETE FROM products WHERE id = ?"
-    ).run(id);
+      const result = db.prepare(
+        "DELETE FROM products WHERE id = ?"
+      ).run(id);
 
-    if (result.changes === 0) {
-      return res.status(404).json({
+      if (result.changes === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Product not found."
+        });
+      }
+
+      res.json({
+        success: true,
+        message: "Product deleted successfully."
+      });
+
+    } catch (error) {
+      console.error("Delete product error:", error);
+
+      res.status(500).json({
         success: false,
-        message: "Product not found."
+        message: "Unable to delete product."
       });
     }
-
-    res.json({
-      success: true,
-      message: "Product deleted successfully."
-    });
-  } catch (error) {
-    console.error("Delete product error:", error);
-
-    res.status(500).json({
-      success: false,
-      message: "Unable to delete product."
-    });
   }
-});
+);
 
-// Initialize Paystack payment
+// Initialize Paystack payment.
 app.post("/api/initialize-payment", async (req, res) => {
   try {
     const secretKey = process.env.PAYSTACK_SECRET_KEY;
@@ -476,7 +429,7 @@ app.post("/api/initialize-payment", async (req, res) => {
     if (!secretKey) {
       return res.status(500).json({
         success: false,
-        message: "Paystack secret key is missing from .env."
+        message: "Paystack secret key is missing."
       });
     }
 
@@ -532,7 +485,7 @@ app.post("/api/initialize-payment", async (req, res) => {
       if (quantity > product.stock) {
         return res.status(400).json({
           success: false,
-          message: "Not enough stock available for a product in your cart."
+          message: "Not enough stock available."
         });
       }
 
@@ -550,10 +503,12 @@ app.post("/api/initialize-payment", async (req, res) => {
       "https://api.paystack.co/transaction/initialize",
       {
         method: "POST",
+
         headers: {
           Authorization: "Bearer " + secretKey,
           "Content-Type": "application/json"
         },
+
         body: JSON.stringify({
           email,
           amount: Math.round(total * 100)
@@ -568,7 +523,9 @@ app.post("/api/initialize-payment", async (req, res) => {
 
       return res.status(400).json({
         success: false,
-        message: paymentResult.message || "Unable to initialize payment."
+        message:
+          paymentResult.message ||
+          "Unable to initialize payment."
       });
     }
 
@@ -577,6 +534,7 @@ app.post("/api/initialize-payment", async (req, res) => {
       authorization_url: paymentResult.data.authorization_url,
       reference: paymentResult.data.reference
     });
+
   } catch (error) {
     console.error("Payment initialization error:", error);
 
@@ -587,15 +545,19 @@ app.post("/api/initialize-payment", async (req, res) => {
   }
 });
 
-// Make uploaded product images publicly accessible
+// Make product pictures publicly accessible.
 app.use("/uploads", express.static(uploadFolder));
 
-// Serve the main website and other public files
+// Serve website files.
 app.use(express.static(__dirname));
 
-// Handle image upload errors
+// Handle upload and server errors.
 app.use((error, req, res, next) => {
   console.error("Server error:", error.message);
+
+  if (res.headersSent) {
+    return next(error);
+  }
 
   if (error instanceof multer.MulterError) {
     return res.status(400).json({
@@ -610,7 +572,9 @@ app.use((error, req, res, next) => {
   });
 });
 
-// Start server
+// Start server.
 app.listen(PORT, () => {
-  console.log("Prime Shopping Hub is running at http://localhost:" + PORT);
+  console.log(
+    "Prime Shopping Hub is running on port " + PORT
+  );
 });
