@@ -553,7 +553,7 @@ app.get("/sitemap.xml", (req, res) => {
   res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://prime-shopping-hub-4-production.up.railway.app/</loc>
+    <loc>https://prime-shopping-hub-4-production-28a3ea66.up.railway.app/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
